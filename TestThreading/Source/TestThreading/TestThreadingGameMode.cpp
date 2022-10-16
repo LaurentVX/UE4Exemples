@@ -6,6 +6,9 @@
 #include <Templates/Function.h>
 #include <Misc/ScopeLock.h>
 #include <Misc/SpinLock.h>
+#include <DistributedBuildInterface/Public/DistributedBuildControllerInterface.h>
+#include <Tasks/Task.h>
+#include <HAL/ThreadManager.h>
 
 PRAGMA_DISABLE_OPTIMIZATION
 
@@ -185,7 +188,16 @@ void ATestThreadingGameMode::OnVPressed()
 
 void ATestThreadingGameMode::OnBPressed()
 {
-//	ParallelFor()
+	UE::Tasks::FTask TestTask = UE::Tasks::Launch(UE_SOURCE_LOCATION, []()
+		{
+			ParallelFor(32, [](uint32 Index)
+				{
+					const FString& ThreadName = FThreadManager::GetThreadName(FPlatformTLS::GetCurrentThreadId());
+					if (GEngine)
+						GEngine->AddOnScreenDebugMessage(2000+ (uint64)Index, 2.f, FColor::Green, FString::Printf(TEXT("ParallelFor %u %s"), Index, *ThreadName));
+				});
+		}
+		);
 }
 
 void ATestThreadingGameMode::OnNPressed()
@@ -301,9 +313,13 @@ void FMyWorker::Start()
 	m_Thread = FRunnableThread::Create(this, *FString::Printf(TEXT("FMyWorker %u"), m_Id));
 
 	//FMath::RandInit(m_Id);
-	// 	FLinearColor tempcolor = FLinearColor::MakeFromHSV8(Rand, 255, 255);
-	// 	m_Color = tempcolor.ToFColor(true);
-	m_Color = FColor::MakeRandomColor();
+	static uint8 Hue = 0;
+	FLinearColor tempcolor = FLinearColor::MakeFromHSV8(Hue, 255, 255);
+	Hue+=8;
+	Hue = Hue % 256;
+	m_Color = tempcolor.ToFColor(true);
+
+	//m_Color = FColor::MakeRandomColor();
 	//m_Color.A = 255;
 }
 
